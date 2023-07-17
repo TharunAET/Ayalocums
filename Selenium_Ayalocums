@@ -1,0 +1,145 @@
+import time
+import csv
+import re
+import requests
+from time import sleep
+import string
+from datetime import date
+import pandas as pd
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from openpyxl import Workbook
+from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
+import warnings
+
+
+warnings.filterwarnings("ignore")
+start_time = time.time()
+st_time = time.time()
+
+driver = webdriver.Chrome()
+driver.maximize_window()
+url = "https://www.ayalocums.com/locum-tenens-physician-jobs/"
+
+driver.get(url)
+time.sleep(5)
+
+
+
+location_data = []
+page_no=1
+
+while True:
+    print(f'we are on page {page_no}')
+
+
+    container = driver.find_elements(By.XPATH, "//div[@id='results-container']/div")
+
+
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+    dataa = soup.findAll('div', class_="job-info")
+            
+            
+    for data in dataa:
+
+        location = {"JobType": "Locums"}
+        
+
+        Llo = data.a['href']
+        location["PostUrl"] = Llo
+        print("PostUrl:", Llo)
+
+        jobid = re.sub(r'\D', '', Llo)
+        location["JobID"] = jobid
+        print("JobID:", jobid)
+
+        spec = data.find('li', class_="ico ico-title").text
+        location["Specialty"] = spec
+        print("Specialty:", spec)
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36"
+            }
+
+
+        response=requests.get(Llo,headers=headers)
+        soup1= BeautifulSoup(response.content, 'html.parser')
+        data1 = soup1.findAll('section', id="content")
+
+
+
+        for da in data1:
+
+            Lname = da.find('div', class_="col-100").h1
+            span_tag = Lname.find('span')  
+            if span_tag:
+                span_tag.extract()  
+            title = Lname.get_text(strip=True)  
+            location["Title"] = title
+            print("Title:", title)
+
+            stdate = da.find('li', class_="ico ico-start")
+            stdate = stdate.text.replace("Start Date:", "")
+            location["Start Date"] = stdate
+            print("Start Date:", stdate)
+
+            pay = da.find('li', class_="ico ico-pay")
+            pay = pay.text.replace("Pay:", "")
+            location["Salary Range"] = pay
+            print("Salary Range:", pay)
+
+            sch = da.find('li', class_="ico ico-schedule")
+            sch = sch.text.replace("Schedule:", "")
+            location["Schedule"] = sch
+            print("Schedule:", sch)
+
+
+        location_data.append(location)
+
+
+    df = pd.DataFrame(location_data)
+    df = df[['Title','Start Date','Specialty','Salary Range','Schedule','JobType','JobID','PostUrl']]
+    df.to_excel('Aya_LocumsV1.xlsx',index=False)
+    
+    try:
+        element = driver.find_element(By.XPATH, f"(//div[@id='results-container']/div)[{len(container)}]")
+        driver.execute_script("arguments[0].scrollIntoView();", element)
+        time.sleep(2)
+        next_page= driver.find_element(By.XPATH, "//*[contains(text(),'Next')]")
+        time.sleep(1)
+        next_page.click()
+        page_no+=1
+        time.sleep(5)
+    except:
+        print('Page ended')
+        break
+
+
+
+driver.close()
+driver.quit()
+
+ed_time = time.time()
+duration = ed_time - st_time
+st_time = time.time()
+print(f"Duration: {duration} seconds")
+
+duration = time.time() - start_time
+print(f"Total Duration: {duration} seconds")
+
+
+    
+
+            
+
+
+                
+
